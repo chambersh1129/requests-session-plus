@@ -22,20 +22,6 @@ dependencies = [
 ]
 requires-python = ">=3.7"
 
-[project.optional-dependencies]
-dev = [
-    "bandit",
-    "black",
-    "bumpver",
-    "coverage",
-    "isort",
-    "mypy",
-    "pre-commit",
-    "prospector[with_bandit,with_mypy]",
-    "pytest",
-    "tox"
-]
-
 [project.urls]
 Homepage = "https://github.com/chambersh1129/requests-session-plus"
 
