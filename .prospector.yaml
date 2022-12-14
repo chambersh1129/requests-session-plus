@@ -1,0 +1,30 @@
+# run with 'prospector --profile prospector.yaml'
+max-line-length: 120
+doc-warnings: true
+
+inherits:
+  - strictness_high
+
+pydocstyle:
+  disable:
+    - D104
+    - D203
+    - D213
+    - D407
+    - D413
+
+pylint:
+  disable:
+    - import-outside-toplevel
+    - too-many-ancestors
+    - wrong-import-order  # covered by isort
+    - wrong-import-position  # covered by isort
+  options:
+    django-settings-module: "social.settings"
+    load-plugin: "pylint_django"
+
+mypy:
+  run: true
+
+bandit:
+  run: true
