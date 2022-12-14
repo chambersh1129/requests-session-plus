@@ -8,6 +8,8 @@ An enhanced urllib3.util.retry.Retr() class which:
 Not all HTTP status codes warrant a retry, which is why the STATUS_FORCELIST exists.  It will retry if any of these
 status codes are returned.  Other 4xx or 5xx status codes may not be resolved with a retry so they are not listed.
 """
+from typing import List
+
 from urllib3.util.retry import Retry
 
 
@@ -20,7 +22,7 @@ class SessionPlusRetry(Retry):
 
     BACKOFF_FACTOR: float = 2.5
 
-    STATUS_FORCELIST: list[int] = [
+    STATUS_FORCELIST: List[int] = [
         413,  # Client: Payload Too Large
         429,  # Client: Too Many Requests
         500,  # Server: Internal Server Error
