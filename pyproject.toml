@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "requests-session-plus"
 version = "0.1.0"
-description = "Drop in replacement for requests.Session() with some QOL inhancements"
+description = "Drop in replacement for requests.Session() with some QOL enhancements"
 readme = "README.md"
 authors = [{ name = "Hunter Chambers", email = "chambersh1129@gmail.com" }]
 license = { file = "LICENSE" }
