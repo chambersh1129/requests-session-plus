@@ -29,4 +29,4 @@ jobs:
 
     - name: Publish to PyPI
       run: |
-        twine upload dist/*
+        twine upload --repository ${{ secrets.TWINE_REPOSITORY }} --username ${{ secrets.TWINE_USERNAME }} --password ${{ secrets.TWINE_PASSWORD }} dist/*
