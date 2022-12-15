@@ -50,6 +50,8 @@ class SessionPlus(Session):
         status_exceptions: bool = False,
         timeout: Optional[float] = TIMEOUT,
         verify: bool = True,
+        *args,
+        **kwargs,
     ):
         """Instantiate SessionPlus object with retries and timeout enabled.
 
@@ -65,6 +67,10 @@ class SessionPlus(Session):
         self.retry_backoff_factor = retry_backoff_factor
         self.retry_status_forcelist = retry_status_forcelist
         self.retry_total = retry_total
+
+        for key, value in kwargs.items():
+            if key.startswith("retry_"):
+                self.__dict__[key] = value
 
         self.retry = retry
 
@@ -133,11 +139,16 @@ class SessionPlus(Session):
 
     @property
     def retry_settings(self) -> Dict[str, Any]:
-        return {
+        settings: Dict[str, Any] = {
             "backoff_factor": self._retry_backoff_factor,
             "status_forcelist": self._retry_status_forcelist,
             "total": self._retry_total,
         }
+        for key, value in self.__dict__.items():
+            if key.startswith("retry_"):
+                settings[key.replace("retry_", "")] = value
+
+        return settings
 
     @property
     def status_exceptions(self) -> bool:
@@ -179,7 +190,7 @@ class SessionPlus(Session):
             if value <= 0.0:
                 raise ValueError("timeout must be a float or integer greater than 0")
 
-        elif value == None:
+        elif value is None:
             pass
 
         else:
