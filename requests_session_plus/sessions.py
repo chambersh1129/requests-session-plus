@@ -6,45 +6,45 @@ Drop in replacement for requests.Session() object that enables:
     - Raises exceptions when HTTP status code is >= 400
     - Can disable SSL certificate enforcement and disable warnings
 """
+from typing import Optional
 
 from requests import Response, Session
 from requests.adapters import HTTPAdapter
 from urllib3 import disable_warnings
-from urllib3.util.retry import Retry
 
 from .adapters import TimeoutAdapter
 from .retries import SessionPlusRetry
 
 
 class SessionPlus(Session):
-    """requests.Session() object with some quality of life enhancements.
-
-    Args:
-        Session (requests.Session): A Requests session
-    """
+    """requests.Session() object with some quality of life enhancements."""
 
     def __init__(
         self,
-        retry: Retry = SessionPlusRetry(),
-        adapter: HTTPAdapter = TimeoutAdapter(),
-        raise_status_exceptions: bool = True,
-        allow_insecure: bool = False,
+        raise_status_exceptions: bool = False,
+        retry: bool = True,
+        timeout: Optional[int] = 5,
+        verify: bool = True,
     ):
-        """Instantiate SessionPlus object will everything enabled except for allow_insecure.
+        """Instantiate SessionPlus object with retries and timeout enabled.
 
         Args:
-            retry (Retry, optional): Allow retries of failed HTTP calls. Defaults to SessionPlusRetry().
-            adapter (HTTPAdapter, optional): Set a timeout for HTTP calls. Defaults to TimeoutAdapter().
-            raise_status_exceptions (bool, optional): Raise exceptions for status codes >=400. Defaults to True.
-            allow_insecure (bool, optional): Set verify=False and disable warnings. Defaults to False.
+            raise_status_exceptions (bool): Raise exceptions for status codes >=400. Defaults to False.
+            retry (bool): Allow retries of failed HTTP calls. Defaults to True.
+            timeout (int, None): Set a timeout for HTTP calls. Defaults to 5.
+            verify (bool): Set verify=False to disable SSL verification and warnings. Defaults to True.
+
         """
         super().__init__()
 
-        if not adapter:
+        if not timeout:
             adapter = HTTPAdapter()
 
+        else:
+            adapter = TimeoutAdapter(timeout=timeout)
+
         if retry:
-            adapter.max_retries = Retry.from_int(retry)
+            adapter.max_retries = SessionPlusRetry()
 
         self.mount("https://", adapter)
         self.mount("http://", adapter)
@@ -52,7 +52,7 @@ class SessionPlus(Session):
         if raise_status_exceptions:
             self.hooks["response"].append(self._raise_exception_response_hook)
 
-        if allow_insecure:
+        if not verify:
             self.verify: bool = False
             disable_warnings()
 

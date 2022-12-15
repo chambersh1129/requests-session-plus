@@ -4,25 +4,24 @@ An enhanced HTTPAdapter that will set a timeout for all HTTP calls
 """
 from requests.adapters import HTTPAdapter
 
+DEFAULT_TIMEOUT: int = 5
+
 
 class TimeoutAdapter(HTTPAdapter):
-    """HTTP Adapter with a default timeout set to 2 seconds.
+    """HTTP Adapter with a default timeout set to 5 seconds.
 
-    Can overwrite the default timeout of 2 at initialization and when making calls
+    Can overwrite the default timeout at initialization and when making calls
 
     Args:
         HTTPAdapter (HTTPAdapter): The built-in HTTP Adapter for urllib3
     """
 
-    DEFAULT_TIMEOUT: int = 5
+    timeout: int = DEFAULT_TIMEOUT
 
     def __init__(self, *args, **kwargs):
-        """Allow the overriding of the DEFAULT_TIMEOUT and set it if it wasn't provided."""
-        self.timeout = self.DEFAULT_TIMEOUT
-
+        """Overwrite the timeout if provided as a parameter"""
         if "timeout" in kwargs:
-            self.timeout = kwargs["timeout"]
-            del kwargs["timeout"]
+            self.timeout = kwargs.pop("timeout")
 
         super().__init__(*args, **kwargs)
 
@@ -33,7 +32,7 @@ class TimeoutAdapter(HTTPAdapter):
             request (Request): HTTP Request object
 
         Returns
-            response: requests Response object
+            response: urllib3 Response object
         """
         if "timeout" not in kwargs:
             kwargs["timeout"] = self.timeout
