@@ -17,6 +17,7 @@ pylint:
     - django-not-available
     - import-outside-toplevel
     - too-many-ancestors
+    - unused-argument
     - wrong-import-order  # covered by isort
     - wrong-import-position  # covered by isort
 
