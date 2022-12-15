@@ -5,101 +5,125 @@ test every feature.  Instead we can just make sure classes and methods are updat
 urllib3 are working as intended.
 """
 
-import requests
-import urllib3
 
-from requests_session_plus.adapters import TimeoutAdapter
-from requests_session_plus.retries import BACKOFF_FACTOR, STATUS_FORCELIST, TOTAL, SessionPlusRetry
-from requests_session_plus.sessions import SessionPlus
+from typing import List
 
+import pytest
 
-def test_SessionPlus_defaults():
-    session = SessionPlus()
+from requests_session_plus import RETRY_BACKOFF_FACTOR, RETRY_STATUS_FORCELIST, RETRY_TOTAL, TIMEOUT, SessionPlus
 
 
-def test_raise_status_exceptions():
-    """Validate the response hook is configured correctly."""
+def retry_check(session: SessionPlus) -> bool:
+    protos = ["http://", "https://"]
 
-    session = SessionPlus(
-        retry=False,  # don't retry
-        raise_status_exceptions=True,  # enable exceptions
-        timeout=None,  # defaults to HTTPAdapter
-        verify=True,  # verify certificate
-    )
+    if session.retry:
+        values = session.retry_settings
+    else:
+        values = {"total": 0, "read": False}
 
+    for proto in protos:
+        retry_obj = session.adapters[proto].max_retries
+        for k, v in values.items():
+            assert retry_obj.__dict__[k] == v
+
+
+def status_exceptions_check(session: SessionPlus) -> bool:
     assert "response" in session.hooks
 
-    found_hook = False
-    hook_name = SessionPlus._raise_exception_response_hook.__name__
+    found_hook: bool = False
+    hook_name: str = SessionPlus._status_exception_response_hook.__name__
 
     for hook in session.hooks["response"]:
         if hook.__name__ == hook_name:
             found_hook = True
             break
 
-    assert found_hook
+    assert session.status_exceptions == found_hook
 
 
-def test_retry_without_timeout():
-    """Validate our SessionPlusRetry class gets applied correctly to the HTTPAdapter in the SessionPlus class."""
+def test_retry():
+    session = SessionPlus(retry=False)
 
-    session = SessionPlus(
-        retry=True,  # ensure retries are enabled
-        raise_status_exceptions=False,  # disable for first pass
-        timeout=None,  # defaults to HTTPAdapter
-        verify=True,  # verify certificate
-    )
+    retry_check(session)
 
-    protos = ["http://", "https://"]
+    session.retry = False
+    assert not session.retry
+    retry_check(session)
 
-    for proto in protos:
-        assert proto in session.adapters
-        assert session.adapters[proto].__class__ == requests.adapters.HTTPAdapter
-        assert session.adapters[proto].max_retries.__class__ == SessionPlusRetry
-        assert session.adapters[proto].max_retries.total == TOTAL
-        assert session.adapters[proto].max_retries.backoff_factor == BACKOFF_FACTOR
-        assert session.adapters[proto].max_retries.status_forcelist == STATUS_FORCELIST
+    new_backoff_factor: float = RETRY_BACKOFF_FACTOR + 1
+    session.retry_backoff_factor = new_backoff_factor
+    assert session.retry_backoff_factor == new_backoff_factor
 
+    new_status_forcelist: List[int] = RETRY_STATUS_FORCELIST.copy()
+    new_status_forcelist.pop(0)
+    session.retry_status_forcelist = new_status_forcelist
+    assert session.retry_status_forcelist == new_status_forcelist
 
-def test_retry_with_timeout():
-    """Validate our SessionPlusRetry class gets applied correctly to the TimeoutAdapter in the SessionPlus class."""
+    new_total: int = RETRY_TOTAL + 1
+    session.retry_total = new_total
+    assert session.retry_total == new_total
 
-    session = SessionPlus(
-        retry=True,  # ensure retries are enabled
-        raise_status_exceptions=False,  # disable for first pass
-        timeout=5,  # use the TimeoutAdapter
-        verify=True,  # verify certificate
-    )
-
-    protos = ["http://", "https://"]
-
-    for proto in protos:
-        assert proto in session.adapters
-        assert session.adapters[proto].__class__ == TimeoutAdapter
-        assert session.adapters[proto].max_retries.__class__ == SessionPlusRetry
-        assert session.adapters[proto].max_retries.total == TOTAL
-        assert session.adapters[proto].max_retries.backoff_factor == BACKOFF_FACTOR
-        assert session.adapters[proto].max_retries.status_forcelist == STATUS_FORCELIST
+    session.retry = True
+    assert session.retry
+    retry_check(session)
 
 
-def test_timeout_without_retry():
-    """Validate our TimeoutAdapter can be created with a default urllib3 Retry class."""
-    session = SessionPlus(
-        retry=False,  # don't retry
-        raise_status_exceptions=False,  # disable for first pass
-        timeout=5,  # use the TimeoutAdapter
-        verify=True,  # verify certificate
-    )
+def test_retry_validation():
+    session = SessionPlus()
 
-    protos = ["http://", "https://"]
+    for value in [100, "taco", ["taco"]]:
 
-    for proto in protos:
-        assert proto in session.adapters
-        assert session.adapters[proto].__class__ == TimeoutAdapter
-        assert session.adapters[proto].max_retries.__class__ == urllib3.util.retry.Retry
-        assert session.adapters[proto].max_retries.total == 0  # urllib3 Retry default
-        assert session.adapters[proto].max_retries.backoff_factor == 0  # urllib3 Retry default
+        with pytest.raises(ValueError):
+            SessionPlus(retry_status_forcelist=value)
+
+        with pytest.raises(ValueError):
+            session.retry_status_forcelist = value
 
 
-def test_with_allow_insecure():
-    pass
+def test_status_exceptions():
+    """Validate the response hook is configured correctly."""
+
+    session = SessionPlus(status_exceptions=True)
+
+    # make sure the response hook exists
+    assert session.status_exceptions
+    status_exceptions_check(session)
+
+    # enable it a few times to make sure we don't keep appending to hook list
+    pre_count = len(session.hooks["response"])
+
+    session.status_exceptions = True
+    session.status_exceptions = True
+    session.status_exceptions = True
+    assert session.status_exceptions
+    status_exceptions_check(session)
+    assert pre_count == len(session.hooks["response"])
+
+    # make sure we can disable it
+    session.status_exceptions = False
+    assert not session.status_exceptions
+    status_exceptions_check(session)
+
+    # re-enable just to make sure we can set it on instantiation as well as toggle it
+    session.status_exceptions = True
+    assert session.status_exceptions
+    status_exceptions_check(session)
+
+
+def test_timeout_validation():
+    session = SessionPlus()
+
+    assert session.timeout == TIMEOUT
+
+    session.timeout = 300
+    assert session.timeout == 300
+
+    session.timeout = None
+    assert session.timeout is None
+
+    for value in [-1, 0, "0", "taco", [], [1, 2, 3], {}]:
+        with pytest.raises(ValueError):
+            SessionPlus(timeout=value)
+
+        with pytest.raises(ValueError):
+            session.timeout = value
