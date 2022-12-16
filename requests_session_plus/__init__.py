@@ -27,7 +27,7 @@ RETRY_STATUS_FORCELIST: List[int] = [
     504,  # Server: Gateway Timeout
 ]
 RETRY_TOTAL: int = 5
-TIMEOUT: Optional[float] = 10
+TIMEOUT: float = 10
 
 
 class SessionPlus(Session):
@@ -50,17 +50,18 @@ class SessionPlus(Session):
         status_exceptions: bool = False,
         timeout: Optional[float] = TIMEOUT,
         verify: bool = True,
-        *args,
         **kwargs,
     ):
-        # TODO fix args
-        """Instantiate SessionPlus object with retries and timeout enabled.
+        """Instantiate SessionPlus object with timeout enabled.
 
         Args:
-            raise_status_exceptions (bool): Raise exceptions for status codes >=400. Defaults to False.
-            retry (bool): Allow retries of failed HTTP calls. Defaults to False.
-            timeout (int, None): Set a timeout for HTTP calls. Defaults to 10.
-            verify (bool): Set verify=False to disable SSL verification and warnings. Defaults to True.
+            retry (bool): enable/disable retries.  Defaults to False
+            retry_backoff_factor (float): used when calculating time between retries.  Defaults to 2
+            retry_status_forcelist (list[int]): status codes to issue retries for.  Defaults to [413,429,500,502-504]
+            retry_total (int): total number of retries to attempt.  Defaults to 5
+            status_exceptions (bool): raise exceptions for status codes >=400.  Defaults to False
+            timeout (int or None): timeout for HTTP calls.  Defaults to 10
+            verify (bool): enable/disable certificate verification.  Defaults to True
 
         """
         super().__init__()
@@ -84,42 +85,44 @@ class SessionPlus(Session):
 
     @property
     def retry(self) -> bool:
+        """Property to determine if retries are enabled/disabled."""
         return self._retry
 
     @retry.setter
     def retry(self, value: bool):
+        """Set boolean value then call helper function to enable/disable retries."""
         self._retry = bool(value)
         self.update_retry()
 
     def update_retry(self):
-        """Allow the ad-hoc update of the Retry class so we don't have to create a new SessionPlus every time.
-
-        Args:
-            retry_class (Retry, optional): (Re)set the Retry class if needed. Defaults to SessionPlusRetry.
-        """
+        """Re-apply the Retry class with updated variables."""
         if self._retry:
             retry = Retry(**self.retry_settings)
 
         else:
             retry = Retry(total=0, read=False)
 
-        for proto, adapter in self.adapters.items():
+        for adapter in self.adapters.values():
             adapter.max_retries = retry
 
     @property
     def retry_backoff_factor(self) -> float:
+        """Property used to determine backoff sleep time between retries."""
         return self._retry_backoff_factor
 
     @retry_backoff_factor.setter
     def retry_backoff_factor(self, value: float):
+        """Validate the value is a float."""
         self._retry_backoff_factor = float(value)
 
     @property
     def retry_status_forcelist(self) -> List[int]:
+        """Property used to determine which status codes require a retry."""
         return self._retry_status_forcelist
 
     @retry_status_forcelist.setter
     def retry_status_forcelist(self, values: List[int]):
+        """Validate the value is a list of integers."""
         if not isinstance(values, list):
             raise ValueError("retry_status_forcelist must be a list of integers")
 
@@ -132,14 +135,17 @@ class SessionPlus(Session):
 
     @property
     def retry_total(self) -> int:
+        """Property to return the total number of retries."""
         return self._retry_total
 
     @retry_total.setter
     def retry_total(self, value: int):
+        """Validate the value is an integer."""
         self._retry_total = int(value)
 
     @property
     def retry_settings(self) -> Dict[str, Any]:
+        """Property to generate the Retry settings dictionary."""
         settings: Dict[str, Any] = {
             "backoff_factor": self._retry_backoff_factor,
             "status_forcelist": self._retry_status_forcelist,
@@ -153,10 +159,12 @@ class SessionPlus(Session):
 
     @property
     def status_exceptions(self) -> bool:
+        """Property to determine if exceptions should be raised for status codes >=400."""
         return self._status_exceptions
 
     @status_exceptions.setter
     def status_exceptions(self, value: bool):
+        """Set the value then modify the response hooks."""
         self._status_exceptions = bool(value)
 
         entry_index: Optional[int] = None
@@ -181,11 +189,13 @@ class SessionPlus(Session):
         response.raise_for_status()
 
     @property
-    def timeout(self) -> float:
+    def timeout(self) -> Optional[float]:
+        """Property to determine maximum time to wait for HTTP response before raising exception."""
         return self._timeout
 
     @timeout.setter
     def timeout(self, value: Optional[float]):
+        """Timeout can be number >0 or None where None disables timeout."""
         if isinstance(value, (float, int, str)):
             value = float(value)
             if value <= 0.0:
@@ -199,12 +209,14 @@ class SessionPlus(Session):
 
         self._timeout = value
 
-    @property
+    @property  # type: ignore
     def verify(self) -> bool:
+        """Property to determine if certificates should be validated or not."""
         return self._verify
 
     @verify.setter
     def verify(self, value: bool):
+        """Set the boolean them cycle through each warning and add/remove warnings as needed."""
         self._verify = bool(value)
 
         key: str = "default" if self._verify else "ignore"
@@ -216,19 +228,18 @@ class SessionPlus(Session):
                 if warn[0] == key:
                     filter_found = True
                 else:
-                    print(f"{warn[0]} - {warn[2]} - needs to be removed")
                     pop_filters.append(i)
 
         if pop_filters:
             pop_filters.reverse()
             for filter_index in pop_filters:
-                warnings.filters.pop(filter_index)
+                warnings.filters.pop(filter_index)  # type: ignore
 
         if not filter_found:
-            warnings.simplefilter(key, HTTPWarning)
+            warnings.simplefilter(key, HTTPWarning)  # type: ignore
 
     def send(self, request, **kwargs):
-
+        """Send a given PreparedRequest."""
         if not kwargs.get("timeout") and self.timeout:
             kwargs["timeout"] = self.timeout
 
