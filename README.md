@@ -21,7 +21,7 @@ Sessions can be useful because information caries over from HTTP call to HTTP ca
 
 [![build](https://github.com/chambersh1129/requests-session-plus/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/chambersh1129/requests-session-plus/actions/workflows/build.yml?query=branch%3Amain)
 [![coverage](https://img.shields.io/codecov/c/github/chambersh1129/requests-session-plus/main)](https://app.codecov.io/gh/chambersh1129/requests-session-plus)
-![pypi](https://img.shields.io/badge/pypi-0.3.1-blue)
+![pypi](https://img.shields.io/badge/pypi-1.0.0-blue)
 ![python](https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9%20%7C%203.10%20%7C%203.11-blue)
 ![license](https://img.shields.io/badge/license-GNUv3-green)
 ![code style](https://img.shields.io/badge/code%20style-black-black)
