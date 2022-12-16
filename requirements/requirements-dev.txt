@@ -5,3 +5,4 @@
 bumpver
 pre-commit
 tox
+tox-gh-actions
