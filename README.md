@@ -2,8 +2,6 @@
 
 Drop in replacement for [requests.Session()](https://requests.readthedocs.io/en/latest/user/advanced/#session-objects) with some quality of life enhancements.
 
-Sessions can be useful because information caries over from HTTP call to HTTP call.  For example, there is a cookie jar shared between all HTTP calls within a Session.
-
 ```python
 >>> from requests_session_plus import SessionPlus  # equivalent to "from requests import Session"
 >>> s = SessionPlus()
@@ -21,7 +19,7 @@ Sessions can be useful because information caries over from HTTP call to HTTP ca
 
 [![build](https://github.com/chambersh1129/requests-session-plus/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/chambersh1129/requests-session-plus/actions/workflows/build.yml?query=branch%3Amain)
 [![coverage](https://img.shields.io/codecov/c/github/chambersh1129/requests-session-plus/main)](https://app.codecov.io/gh/chambersh1129/requests-session-plus)
-![pypi](https://img.shields.io/badge/pypi-1.0.0-blue)
+![pypi](https://img.shields.io/badge/pypi-1.0.1-blue)
 ![python](https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9%20%7C%203.10%20%7C%203.11-blue)
 ![license](https://img.shields.io/badge/license-GNUv3-green)
 ![code style](https://img.shields.io/badge/code%20style-black-black)
@@ -43,26 +41,44 @@ Feature | Session() | SessionPlus() |
 --- | --- | ---
 Default HTTP(S) Call Timeout | 0 | 10 |
 HTTP(S) Timeout Set | per call | globally and per call | |
-Disable Cert Verification | per call | globally and per call |
-Disable Cert Verification Warnings | no | yes |
+Disable Certificate Verification | per call | globally and per call |
+Disable Certificate Verification Warnings | no | yes |
 Raise Exceptions For Client/Server Issues | no | yes |
 Retry Count | 0 | 5 |
 Retry Backoff Factor | 0 | 2 |
 Retry For Status Codes | 413, 429, 503 | 413, 429, 500, 502-504 |
 
-Timeouts and certificate validation are enabled by default in SessionPlus, the others disabled.  All features can be enabled/disabled ad hoc as needed.
+Timeouts and certificate verification are enabled by default in SessionPlus, the others disabled.  All features can be enabled/disabled ad hoc as needed.
 
 # Usage
 
 SessionPlus can be used in the exact same way as a [requests Session object](https://requests.readthedocs.io/en/latest/user/advanced/#session-objects) so I'm going to rely on their documentation for most use cases.  In the following sections I'll just go over the benefits of each feature this package utilizes and how to enable/disable/modify them.
 
+To make the most out of this package and its features you should have a strong understanding of your HTTP endpoints and how each feature could help.  Some suspiciously specific examples that I may or may not have run into:
+
+- Making API calls to an internal network appliance where tacacs occasionally fails?
+    - Disable certificate verification
+    - Enable retries
+    - Add 401 to "retry_status_forcelist" parameter
+- Is there an API endpoint hosted in Kubernetes where aggressive health checks recycle the containers leading to occasional 502 Bad Gateway responses?
+    - Enable retries
+- Is there an API endpoint that has a habit of either responding quickly or getting hung and not responding at all?
+    - Enable retries
+    - Set the timeout to be a little higher than its average response time (if 10 second default isn't sufficient)
+- Is there a cheeky developer who likes to use quirky or non-standard HTTP status codes (such as 418 I'm a Teapot) for client/server issues?
+    - Enable status exceptions which raises an exception for any status code >=400
+    - You can also enable retries and expand the "retry_status_forcelist" parameter
+        - Any status code in "retry_status_forcelist" will issue retries
+        - All other status codes >=400 will raise an exception
+        - Example: lets retry 418, but don't bother retrying for 411
+
 ## Certificate Verification
 
 This is enabled by default in both the default Session class and SessionPlus.  SessionPlus just provides an easy way to toggle it on and off globally.
 
-It is not recommended to disable cert verification but useful when working with HTTP endpoints which use a self-signed cert or have some other cert issue.  It both disables the [certificate check](https://requests.readthedocs.io/en/latest/user/advanced/#ssl-cert-verification) but also disables the warnings that bark at you when you disable cert checks.
+It is not recommended to disable certificate verification but useful when working with HTTP endpoints which use a self-signed certificate or have some other certificate issue.  It both disables the [certificate check](https://requests.readthedocs.io/en/latest/user/advanced/#ssl-cert-verification) but also disables the warnings that bark at you when you disable certificate checks.
 
-**NOTE:** If [retries](#retries) are also enabled, retries will be issued for HTTP calls to servers that have bad certs.
+**NOTE:** If [retries](#retries) are also enabled, retries will be issued for HTTP calls to servers that have bad certificates.
 
 ## Configuring Certificate Verification
 
@@ -75,12 +91,12 @@ Parameter:
 >>> s = SessionPlus(verify=False)  # disable certificate verification
 ```
 
-Cert verification can be toggled on/off
+Certificate verification can be toggled on/off
 
 ```python
 >>> s = SessionPlus()  # enabled by default
 >>> s.verify = False  # temporarily disable it
->>> # ... make HTTP call to server with a bad cert ...
+>>> # ... make 1 or more HTTP call to server with a bad certificate ...
 >>> s.verify = True  # re-enable and continue
 ```
 
@@ -91,7 +107,7 @@ Making an HTTP call to server with a bad cert
 >>> s.get("https://self-signed.badssl.com/")
 # ... output compressed ...
 # SSLError exception thrown
-requests.exceptions.SSLError: HTTPSConnectionPool(host='self-signed.badssl.com', port=443): Max retries exceeded with url: / (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:997)')))
+requests.exceptions.SSLError: HTTPSConnectionPool(host='self-signed.badssl.com', port=443): Max retries exceeded with url: / (Caused by SSLError(SSLcertificateVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:997)')))
 >>>
 ```
 
@@ -109,7 +125,7 @@ If we utilize the requests way of disabling certificates, we get warnings
 
 ```python
 >>> s = SessionPlus()
->>> s.get("https://self-signed.badssl.com/", verify=False)  # disable cert verification
+>>> s.get("https://self-signed.badssl.com/", verify=False)  # disable certificate verification
 # warnings are thrown
 /home/chambersh1129/Documents/code/personal/requests-session-plus/venv/lib/python3.10/site-packages/urllib3/connectionpool.py:1045: InsecureRequestWarning: Unverified HTTPS request is being made to host 'self-signed.badssl.com'. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.io/en/1.26.x/advanced-usage.html#ssl-warnings
   warnings.warn(
@@ -400,4 +416,4 @@ requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='httpstat.us', port=44
 1.0
 ```
 
-**NOTE:** Once again, disabling timeouts isn't a silver bullet.  Other timeouts come into play, but at the python level (urllib3 timeouts, socket timeouts) or at the server level (NGINX proxy_read_timeout for example).  Setting the timeout=None for an HTTP call does not guarantee you will not receive an exception.
+**NOTE:** Once again, disabling timeouts isn't a silver bullet.  Other timeouts come into play, both at the python level (urllib3 timeouts, socket timeouts) or at the server level (NGINX proxy_read_timeout for example).  Setting timeout=None for an HTTP call does not guarantee exceptions aren't raised.
