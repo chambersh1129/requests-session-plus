@@ -1,10 +1,10 @@
 """requests_session_plus/__init__.py.
 
-Drop in replacement for requests.Session() object that enables:
-    - Automatic retries with a backoff period between HTTP calls
-    - Sets a timeout for every HTTP call
-    - Raises exceptions when HTTP status code is >= 400
-    - Can disable SSL certificate enforcement and disable warnings
+Drop in replacement for requests.Session() object that supports:
+    - toggle on/off retries with helpful defaults
+    - toggle on/off certificate checks and warnings
+    - toggle on/off raising exception for client/server errors (status code >= 400)
+    - sets global timeout for all HTTP calls
 """
 
 import warnings
@@ -17,7 +17,7 @@ from urllib3.util.retry import Retry
 __all__: List[str] = ["SessionPlus"]
 
 
-RETRY_BACKOFF_FACTOR: float = 2.5
+RETRY_BACKOFF_FACTOR: float = 2
 RETRY_STATUS_FORCELIST: List[int] = [
     413,  # Client: Payload Too Large
     429,  # Client: Too Many Requests
@@ -27,7 +27,7 @@ RETRY_STATUS_FORCELIST: List[int] = [
     504,  # Server: Gateway Timeout
 ]
 RETRY_TOTAL: int = 5
-TIMEOUT: Optional[float] = 5
+TIMEOUT: Optional[float] = 10
 
 
 class SessionPlus(Session):
@@ -43,7 +43,7 @@ class SessionPlus(Session):
 
     def __init__(
         self,
-        retry: bool = True,
+        retry: bool = False,
         retry_backoff_factor: float = RETRY_BACKOFF_FACTOR,
         retry_status_forcelist: List[int] = RETRY_STATUS_FORCELIST,
         retry_total: int = RETRY_TOTAL,
@@ -53,12 +53,13 @@ class SessionPlus(Session):
         *args,
         **kwargs,
     ):
+        # TODO fix args
         """Instantiate SessionPlus object with retries and timeout enabled.
 
         Args:
             raise_status_exceptions (bool): Raise exceptions for status codes >=400. Defaults to False.
-            retry (bool): Allow retries of failed HTTP calls. Defaults to True.
-            timeout (int, None): Set a timeout for HTTP calls. Defaults to 5.
+            retry (bool): Allow retries of failed HTTP calls. Defaults to False.
+            timeout (int, None): Set a timeout for HTTP calls. Defaults to 10.
             verify (bool): Set verify=False to disable SSL verification and warnings. Defaults to True.
 
         """
@@ -68,6 +69,7 @@ class SessionPlus(Session):
         self.retry_status_forcelist = retry_status_forcelist
         self.retry_total = retry_total
 
+        # load any additional namespaced retry settings as attributes
         for key, value in kwargs.items():
             if key.startswith("retry_"):
                 self.__dict__[key] = value
@@ -87,20 +89,19 @@ class SessionPlus(Session):
     @retry.setter
     def retry(self, value: bool):
         self._retry = bool(value)
+        self.update_retry()
 
-        if self._retry:
-            self._update_adapter_retries(retry_settings=self.retry_settings)
-
-        else:
-            self._update_adapter_retries(retry_settings={"total": 0, "read": False})
-
-    def _update_adapter_retries(self, retry_settings: Dict[str, Any]):
+    def update_retry(self):
         """Allow the ad-hoc update of the Retry class so we don't have to create a new SessionPlus every time.
 
         Args:
             retry_class (Retry, optional): (Re)set the Retry class if needed. Defaults to SessionPlusRetry.
         """
-        retry = Retry(**retry_settings)
+        if self._retry:
+            retry = Retry(**self.retry_settings)
+
+        else:
+            retry = Retry(total=0, read=False)
 
         for proto, adapter in self.adapters.items():
             adapter.max_retries = retry
