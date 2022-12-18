@@ -68,6 +68,34 @@ def test_retry():
     retry_check(session)
 
 
+def test_retry_extra_args():
+    """Validate namespaced arguments are presented in retry_settings dictionary."""
+    retry_key_1 = "retry_init_test"
+    retry_val_1 = "this is an init arg"
+
+    retry_key_2 = "retry_post_init"
+    retry_val_2 = "this is a post init arg"
+
+    bad_retry_arg = "bad_retry_arg"
+    bad_retry_val = "this should not show up"
+
+    session = SessionPlus(retry_init_test=retry_val_1, bad_retry_arg=bad_retry_val)
+    session.retry_post_init = retry_val_2
+
+    for k, v in [(retry_key_1, retry_val_1), (retry_key_2, retry_val_2)]:
+
+        assert k not in session.retry_settings.keys()
+
+        k = k.replace("retry_", "")
+
+        assert k in session.retry_settings
+        assert session.retry_settings[k] == v
+
+    assert bad_retry_arg not in session.__dict__.keys()
+    assert bad_retry_arg not in session.retry_settings.keys()
+    assert bad_retry_val not in session.retry_settings.values()
+
+
 def test_retry_validation():
     session = SessionPlus()
 
