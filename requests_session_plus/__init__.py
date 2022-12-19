@@ -126,7 +126,7 @@ class SessionPlus(Session):
         if not isinstance(values, (set, list)):
             raise ValueError("retry_status_forcelist must be a set or a list of integers")
 
-        new_set: Set[int] = set([int(x) for x in values])
+        new_set: Set[int] = set(int(x) for x in values)
 
         self._retry_status_forcelist = new_set
 
