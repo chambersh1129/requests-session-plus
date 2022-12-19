@@ -36,7 +36,7 @@ $ python -m pip install requests_session_plus
 
 # Comparison to Requests Session Class
 
-All of these features are currently available in the standard requests Session class with some configuration/modification.  The goal of SessionPlus is to make the more easily accessible.
+All of these features are currently available in the standard requests Session class with some configuration/modification.  The goal of SessionPlus is to make them more easily accessible.
 
 Feature | Session() | SessionPlus() |
 --- | --- | ---
@@ -180,7 +180,7 @@ An example, with status_exceptions and retries enabled.
 requests.exceptions.HTTPError: 418 Client Error: Im a teapot for url: https://httpstat.us/418/
 ```
 
-In the above case, retries were not used because 418 was not in the default [retry_status_forcelist](#configuring-retries).  We can try again with a status code that is in the list.
+**Note:** If both status_exceptions and retries are enabled and the status code is in [retry_status_forcelist](#configuring-retries), retries will be issued.  If this is unwanted behavior, retry_status_forcelist could be modified to be an empty list or set.
 
 ```python
 >>> s = SessionPlus(status_exceptions=True, retries=True)
@@ -211,7 +211,6 @@ Retries are helpful if the server uptime is spotty and the calls are idempotent.
 If retries are enabled, they will be used for:
  - TimeoutErrors when timeoutes are enabled
  - SSLErrors when verify=True
- - HTTP status codes >=400 when status_exceptions=True
  - For certain status codes set in retry_status_forcelist, even if status_exceptions=True
 
  The default status codes configured for retries in SessionPlus are:
@@ -275,7 +274,7 @@ Example #3
     - 80s after the fourth failure
     - 160s after the fifth failure
 
-A total of 310 seconds is spent trying to get a response.  The Server Unavailable issue might be resolved by then.
+A total of 310 seconds is spent trying to get a response.  The Service Unavailable issue might be resolved by then.
 
 ## Configuring Retries
 
@@ -286,7 +285,7 @@ SessionPlus sets defaults for 3 specific parameters and there is a fourth parame
 Parameter:
  - retry : bool : enable or disable retry functionality. Defaults to False
  - retry_backoff_factor : float : used in the formula to determine how long to wait before retrying.  Defaults to 2
- - retry_status_forcelist : list : HTTP status codes to retry. Defaults to [413, 429, 500, 502, 503, 504]
+ - retry_status_forcelist : set : HTTP status codes to retry. Defaults to {413, 429, 500, 502, 503, 504}
  - retry_total: int : total number of retries before failing. Defaults to 5
 
 ```python
@@ -310,23 +309,44 @@ Viewing/Changing Retry Settings
 >>> s = SessionPlus(retry=True)
 >>> # view the settings
 >>> s.retry_settings
-{'backoff_factor': 2, 'status_forcelist': [413, 429, 500, 502, 503, 504], 'total': 5}
+{'backoff_factor': 2, 'status_forcelist': {429, 500, 502, 503, 504, 413}, 'total': 5}
 >>> # modify a default setting
 >>> s.retry_total = 10
 >>> s.retry_backoff_factor = 5
 >>> s.retry_settings
-{'backoff_factor': 5.0, 'status_forcelist': [413, 429, 500, 502, 503, 504], 'total': 10}
+{'backoff_factor': 5.0, 'status_forcelist': {429, 500, 502, 503, 504, 413}, 'total': 10}
 >>> # passing in new Retry settings.  Note: no validation is done for those not listed above in Parameters
 >>> s.retry_raise_on_status = False
 >>> s.retry_settings
-{'backoff_factor': 5.0, 'status_forcelist': [413, 429, 500, 502, 503, 504], 'total': 10, 'raise_on_status': False}
+{'backoff_factor': 5.0, 'status_forcelist': {429, 500, 502, 503, 504, 413}, 'total': 10, 'raise_on_status': False}
 >>> # initialize new session with all of these settings
 >>> new_session = SessionPlus(retry=True, retry_raise_on_status=False, retry_total=10, retry_backoff_factor=5)
 >>> new_session.retry_settings
-{'backoff_factor': 5.0, 'status_forcelist': [413, 429, 500, 502, 503, 504], 'total': 10, 'raise_on_status': False}
+{'backoff_factor': 5.0, 'status_forcelist': {429, 500, 502, 503, 504, 413}, 'total': 10, 'raise_on_status': False}
 >>> # settings persist, even when retries are disabled
 >>> new_session.retry = False
 >>> new_session.retry_settings
+{'backoff_factor': 5.0, 'status_forcelist': {429, 500, 502, 503, 504, 413}, 'total': 10, 'raise_on_status': False}
+```
+
+retry_status_forcelist is a set, so you need to use add, remove, or = to update it
+
+```python
+>>> s = SessionPlus(retry=True)
+>>> s.retry_status_forcelist
+{429, 500, 502, 503, 504, 413}
+>>> # add a status code
+>>> s.retry_status_forcelist.add(307)
+>>> s.retry_status_forcelist
+{429, 307, 500, 502, 503, 504, 413}
+>>> # remove a status code
+>>> s.retry_status_forcelist.remove(502)
+>>> s.retry_status_forcelist
+{429, 307, 500, 503, 504, 413}
+>>> # update entire set.  Can be set or list of integers
+>>> s.retry_status_forcelist = {418}
+>>> s.retry_status_forcelist
+{418}
 ```
 
 For the retry settings to be completed updated, you need to run .update_retry().  This is done automatically when enabling/disabling retries, this is just a helper method to run if you need to change an existing enabled retry.
@@ -334,11 +354,11 @@ For the retry settings to be completed updated, you need to run .update_retry().
 ```python
 >>> s = SessionPlus(retry=True)
 >>> s.retry_settings
-{'backoff_factor': 2, 'status_forcelist': [413, 429, 500, 502, 503, 504], 'total': 5}
+{'backoff_factor': 2, 'status_forcelist': {429, 500, 502, 503, 504, 413}, 'total': 5}
 >>> # update the settings
 >>> s.retry_total = 10
 >>> s.retry_settings
-{'backoff_factor': 2, 'status_forcelist': [413, 429, 500, 502, 503, 504], 'total': 10}
+{'backoff_factor': 2, 'status_forcelist': {429, 500, 502, 503, 504, 413}, 'total': 10}
 >>> # apply the settings
 >>> s.update_retry()
 ```
@@ -353,8 +373,8 @@ Traceback (most recent call last):
   File "/home/chambersh1129/Documents/code/personal/requests-session-plus/requests_session_plus/__init__.py", line 68, in __init__
     self.retry_status_forcelist = retry_status_forcelist
   File "/home/chambersh1129/Documents/code/personal/requests-session-plus/requests_session_plus/__init__.py", line 123, in retry_status_forcelist
-    raise ValueError("retry_status_forcelist must be a list of integers")
-ValueError: retry_status_forcelist must be a list of integers
+    raise ValueError("retry_status_forcelist must be a set of integers")
+ValueError: retry_status_forcelist must be a set of integers
 >>>
 >>> s.retry_read = "this should be an integer"
 >>> s.update_retry()
