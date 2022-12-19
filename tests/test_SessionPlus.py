@@ -6,7 +6,7 @@ urllib3 are working as intended.
 """
 
 
-from typing import List
+from typing import Set
 
 import pytest
 
@@ -52,15 +52,18 @@ def test_retry():
 
     new_backoff_factor: float = RETRY_BACKOFF_FACTOR + 1
     session.retry_backoff_factor = new_backoff_factor
+    assert session._retry_backoff_factor == new_backoff_factor
     assert session.retry_backoff_factor == new_backoff_factor
 
-    new_status_forcelist: List[int] = RETRY_STATUS_FORCELIST.copy()
-    new_status_forcelist.pop(0)
+    new_status_forcelist: Set[int] = RETRY_STATUS_FORCELIST.copy()
+    new_status_forcelist.pop()
     session.retry_status_forcelist = new_status_forcelist
+    assert session._retry_status_forcelist == new_status_forcelist
     assert session.retry_status_forcelist == new_status_forcelist
 
     new_total: int = RETRY_TOTAL + 1
     session.retry_total = new_total
+    assert session._retry_total == new_total
     assert session.retry_total == new_total
 
     session.retry = True

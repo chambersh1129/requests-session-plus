@@ -8,7 +8,7 @@ Drop in replacement for requests.Session() object that supports:
 """
 
 import warnings
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from requests import Response, Session
 from urllib3.exceptions import HTTPWarning
@@ -18,14 +18,14 @@ __all__: List[str] = ["SessionPlus"]
 
 
 RETRY_BACKOFF_FACTOR: float = 2
-RETRY_STATUS_FORCELIST: List[int] = [
+RETRY_STATUS_FORCELIST: Set[int] = {
     413,  # Client: Payload Too Large
     429,  # Client: Too Many Requests
     500,  # Server: Internal Server Error
     502,  # Server: Bad Gateway
     503,  # Server: Service Unavailable
     504,  # Server: Gateway Timeout
-]
+}
 RETRY_TOTAL: int = 5
 TIMEOUT: float = 10
 
@@ -35,7 +35,7 @@ class SessionPlus(Session):
 
     _retry: bool
     _retry_backof_factor: float
-    _retry_status_forcelist: List[int]
+    _retry_status_forcelist: Set[int]
     _retry_total: int
     _status_exceptions: bool
     _timeout: Optional[float]
@@ -45,7 +45,7 @@ class SessionPlus(Session):
         self,
         retry: bool = False,
         retry_backoff_factor: float = RETRY_BACKOFF_FACTOR,
-        retry_status_forcelist: List[int] = RETRY_STATUS_FORCELIST,
+        retry_status_forcelist: Set[int] = RETRY_STATUS_FORCELIST,
         retry_total: int = RETRY_TOTAL,
         status_exceptions: bool = False,
         timeout: Optional[float] = TIMEOUT,
@@ -57,7 +57,7 @@ class SessionPlus(Session):
         Args:
             retry (bool): enable/disable retries.  Defaults to False
             retry_backoff_factor (float): used when calculating time between retries.  Defaults to 2
-            retry_status_forcelist (list[int]): status codes to issue retries for.  Defaults to [413,429,500,502-504]
+            retry_status_forcelist (set[int]): status codes to issue retries for.  Defaults to [413,429,500,502-504]
             retry_total (int): total number of retries to attempt.  Defaults to 5
             status_exceptions (bool): raise exceptions for status codes >=400.  Defaults to False
             timeout (int or None): timeout for HTTP calls.  Defaults to 10
@@ -116,22 +116,19 @@ class SessionPlus(Session):
         self._retry_backoff_factor = float(value)
 
     @property
-    def retry_status_forcelist(self) -> List[int]:
+    def retry_status_forcelist(self) -> Set[int]:
         """Property used to determine which status codes require a retry."""
         return self._retry_status_forcelist
 
     @retry_status_forcelist.setter
-    def retry_status_forcelist(self, values: List[int]):
+    def retry_status_forcelist(self, values: Set[int]):
         """Validate the value is a list of integers."""
-        if not isinstance(values, list):
-            raise ValueError("retry_status_forcelist must be a list of integers")
+        if not isinstance(values, (set, list)):
+            raise ValueError("retry_status_forcelist must be a set or a list of integers")
 
-        new_list: List[int] = []
+        new_set: Set[int] = set(int(x) for x in values)
 
-        for value in values:
-            new_list.append(int(value))
-
-        self._retry_status_forcelist = new_list
+        self._retry_status_forcelist = new_set
 
     @property
     def retry_total(self) -> int:
@@ -201,10 +198,7 @@ class SessionPlus(Session):
             if value <= 0.0:
                 raise ValueError("timeout must be a float or integer greater than 0")
 
-        elif value is None:
-            pass
-
-        else:
+        elif value is not None:
             raise ValueError("timeout must be a float or integer greater than 0")
 
         self._timeout = value
