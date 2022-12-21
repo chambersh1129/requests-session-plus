@@ -31,7 +31,7 @@ Drop in replacement for [requests.Session()](https://requests.readthedocs.io/en/
 requests_session_plus is available on PyPI:
 
 ```console
-$ python -m pip install requests_session_plus
+$ python -m pip install requests-session-plus
 ```
 
 # Comparison to Requests Session Class
