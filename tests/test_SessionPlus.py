@@ -86,7 +86,6 @@ def test_retry_extra_args():
     session.retry_post_init = retry_val_2
 
     for k, v in [(retry_key_1, retry_val_1), (retry_key_2, retry_val_2)]:
-
         assert k not in session.retry_settings.keys()
 
         k = k.replace("retry_", "")
@@ -103,7 +102,6 @@ def test_retry_validation():
     session = SessionPlus()
 
     for value in [100, "taco", ["taco"]]:
-
         with pytest.raises(ValueError):
             SessionPlus(retry_status_forcelist=value)
 
